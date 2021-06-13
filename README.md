@@ -1,87 +1,56 @@
-![OpenWrt logo](include/logo.png)
+### ++  [openwrt-packages](https://github.com/openwrt/packages "悬停显示")  
+* 默认 ip： 192.168.1.1 ~~（更改位置：[package/base-files/files/bin/config_generate](https://github.com/smalldickman/001/blob/master/package/base-files/files/bin/config_generate "悬停显示")）~~
+* 默认应用：
+    * [docker](https://github.com/lisaac/luci-app-dockerman "悬停显示")  [passwall](https://github.com/xiaorouji/openwrt-package "悬停显示")  [zerotier+filetransfer+ramfree]( https://github.com/coolsnowwolf/lede "悬停显示")  [diskman](https://github.com/lisaac/luci-app-diskman "悬停显示")   [unblockmusic](https://github.com/project-openwrt/luci-app-unblockneteasemusic "悬停显示")
+    * ....+ttyd+samba4+mariadb(full)+postgreSQL(full)+php7+usb2/3+adbye+cfdisk+opkg....
+    
+### 编译
+1. sudo apt-get update
 
-OpenWrt Project is a Linux operating system targeting embedded devices. Instead
-of trying to create a single, static firmware, OpenWrt provides a fully
-writable filesystem with package management. This frees you from the
-application selection and configuration provided by the vendor and allows you
-to customize the device through the use of packages to suit any application.
-For developers, OpenWrt is the framework to build an application without having
-to build a complete firmware around it; for users this means the ability for
-full customization, to use the device in ways never envisioned.
+2. sudo apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libncursesw5-dev libz-dev patch python3 python2.7 unzip zlib1g-dev lib32gcc1 libc6-dev-i386      subversion flex uglifyjs git-core gcc-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint      device-tree-compiler g++-multilib antlr3 gperf wget swig rsync curl llvm libtinfo5
 
-Sunshine!
+3.    tmp  
 
-## Development
+         - [ ] 可选：    ~~sudo ln -s /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.5~~  
 
-To build your own firmware you need a GNU/Linux, BSD or MacOSX system (case
-sensitive filesystem required). Cygwin is unsupported because of the lack of a
-case sensitive file system.
+4.    git clone https://github.com/microdockman/001
 
-### Requirements
+5.    cd 001
 
-You need the following tools to compile OpenWrt, the package names vary between
-distributions. A complete list with distribution specific packages is found in
-the [Build System Setup](https://openwrt.org/docs/guide-developer/build-system/install-buildsystem)
-documentation.
+         - [ ] 可选：  ~~git clone https://github.com/smalldickman/luci-app-unblockmusic.git package/luci-app-unblockmusic~~
+                 
+6.    chmod 777 staging_dir/host/bin/upx
 
-```
-binutils bzip2 diff find flex gawk gcc-6+ getopt grep install libc-dev libz-dev
-make4.1+ perl python3.6+ rsync subversion unzip which
-```
+7.    ./scripts/feeds update -a
 
-### Quickstart
+         - [ ] 可选：  ~~rm -f feeds/packages/net/zerotier/files/etc/init.d/zerotier~~
 
-1. Run `./scripts/feeds update -a` to obtain all the latest package definitions
-   defined in feeds.conf / feeds.conf.default
+         - [ ] 可选：  ~~cp -i 0tmp/luci feeds/luci/modules/luci-base/root/etc/config/luci~~
+         
+         - [ ] 可选：  ~~cp -i 0tmp/index.htm feeds/luci/modules/luci-mod-status/luasrc/view/admin_status/index.htm~~
+              
+         - [ ] 可选：  ~~cp -r 0tmp/runc/* feeds/packages/utils/runc~~  
+         
+         - [ ] 可选：    git clone https://github.com/project-openwrt/luci-app-unblockneteasemusic.git package/luci-app-unblockneteasemusic  
+         
+         - [ ] 可选：  ~~cp -r 0tmp/docker-ce/* feeds/packages/utils/docker-ce~~  
+       
+8.    ./scripts/feeds install -a
 
-2. Run `./scripts/feeds install -a` to install symlinks for all obtained
-   packages into package/feeds/
+9.    make menuconfig
 
-3. Run `make menuconfig` to select your preferred configuration for the
-   toolchain, target system & firmware packages.
+         - [ ] 可选：    cp diffconfig .config && make defconfig  
+ 
+10.    make -j4 download V=s
 
-4. Run `make` to build your firmware. This will download all sources, build the
-   cross-compile toolchain and then cross-compile the GNU/Linux kernel & all chosen
-   applications for your target system.
+         - [ ] 可选：    ./scripts/diffconfig.sh > diffconfig
 
-### Related Repositories
+11.   make -j4 V=s
 
-The main repository uses multiple sub-repositories to manage packages of
-different categories. All packages are installed via the OpenWrt package
-manager called `opkg`. If you're looking to develop the web interface or port
-packages to OpenWrt, please find the fitting repository below.
+### 库
 
-* [LuCI Web Interface](https://github.com/openwrt/luci): Modern and modular
-  interface to control the device via a web browser.
+* [openwrt](https://github.com/openwrt/openwrt "悬停显示")  [kenzok8](https://github.com/kenzok8/openwrt-packages "悬停显示")  [lede](https://github.com/coolsnowwolf/lede "悬停显示")  [lienol](https://github.com/xiaorouji/openwrt-passwall "悬停显示")  
 
-* [OpenWrt Packages](https://github.com/openwrt/packages): Community repository
-  of ported packages.
-
-* [OpenWrt Routing](https://github.com/openwrt/routing): Packages specifically
-  focused on (mesh) routing.
-
-## Support Information
-
-For a list of supported devices see the [OpenWrt Hardware Database](https://openwrt.org/supported_devices)
-
-### Documentation
-
-* [Quick Start Guide](https://openwrt.org/docs/guide-quick-start/start)
-* [User Guide](https://openwrt.org/docs/guide-user/start)
-* [Developer Documentation](https://openwrt.org/docs/guide-developer/start)
-* [Technical Reference](https://openwrt.org/docs/techref/start)
-
-### Support Community
-
-* [Forum](https://forum.openwrt.org): For usage, projects, discussions and hardware advise.
-* [Support Chat](https://webchat.oftc.net/#openwrt): Channel `#openwrt` on **oftc.net**.
-
-### Developer Community
-
-* [Bug Reports](https://bugs.openwrt.org): Report bugs in OpenWrt
-* [Dev Mailing List](https://lists.openwrt.org/mailman/listinfo/openwrt-devel): Send patches
-* [Dev Chat](https://webchat.oftc.net/#openwrt-devel): Channel `#openwrt-devel` on **oftc.net**.
-
-## License
+### License
 
 OpenWrt is licensed under GPL-2.0

@@ -19,7 +19,7 @@
 
          - [ ] 可选：  ~~git clone https://github.com/smalldickman/luci-app-unblockmusic.git package/luci-app-unblockmusic~~
                  
-6.    chmod 777 staging_dir/host/bin/upx
+6.    chmod 777 staging_dir/host/bin/upx staging_dir/hostpkg/bin/ninja
 
 7.    ./scripts/feeds update -a
 

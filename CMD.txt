@@ -1,0 +1,5 @@
+echo $(opkg list-installed | sed -e "s/\s.*$//")    # packages list
+
+cp diffconfig_wax202_suc_003_25M_Xray .config && make defconfig && make menuconfig   
+
+cp diffconfig_wax206_suc_003_28M_Xray .config && make defconfig && make menuconfig  

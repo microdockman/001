@@ -318,7 +318,8 @@ endef
 define KernelPackage/mt7996e
   $(KernelPackage/mt76-default)
   TITLE:=MediaTek MT7996E wireless driver
-  DEPENDS+=@PCI_SUPPORT +kmod-mt76-connac +kmod-hwmon-core +@DRIVER_11AX_SUPPORT +@KERNEL_RELAY
+  DEPENDS+=@PCI_SUPPORT +kmod-mt76-connac +kmod-hwmon-core +@DRIVER_11AX_SUPPORT \
+  	   +@KERNEL_RELAY +@DRIVER_11BE_SUPPORT
   FILES:= $(PKG_BUILD_DIR)/mt7996/mt7996e.ko
   AUTOLOAD:=$(call AutoProbe,mt7996e)
 endef
@@ -659,6 +660,7 @@ define KernelPackage/mt7992-firmware/install
 	cp \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_dsp.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_eeprom.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_eeprom_2i5i.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_rom_patch.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_wa.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_wm.bin \
@@ -670,7 +672,7 @@ define KernelPackage/mt7992-23-firmware/install
 	cp \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_dsp_23.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_eeprom_23.bin \
-		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_eeprom_23.bin \
+		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_eeprom_23_2i5i.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_rom_patch_23.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_wa_23.bin \
 		$(PKG_BUILD_DIR)/firmware/mt7996/mt7992_wm_23.bin \

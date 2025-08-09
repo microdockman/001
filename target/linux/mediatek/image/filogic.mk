@@ -30,6 +30,14 @@ define Build/mt7988-bl31-uboot
 	cat $(STAGING_DIR_IMAGE)/mt7988_$1-u-boot.fip >> $@
 endef
 
+define Build/simplefit
+	cp $@ $@.tmp 2>/dev/null || true
+	ptgen -g -o $@.tmp -a 1 -l 1024 \
+	-t 0x2e -N FIT		-p $(CONFIG_TARGET_ROOTFS_PARTSIZE)M@17k
+	cat $@.tmp >> $@
+	rm $@.tmp
+endef
+
 define Build/mt798x-gpt
 	cp $@ $@.tmp 2>/dev/null || true
 	ptgen -g -o $@.tmp -a 1 -l 1024 \
@@ -72,6 +80,22 @@ endef
 
 define Build/append-openwrt-one-eeprom
 	dd if=$(STAGING_DIR_IMAGE)/mt7981_eeprom_mt7976_dbdc.bin >> $@
+endef
+
+define Build/mstc-header
+  $(eval version=$(word 1,$(1)))
+  $(eval magic=$(word 2,$(1)))
+  gzip -c $@ | tail -c8 > $@.crclen
+  ( \
+    printf "$(magic)"; \
+    tail -c+5 $@.crclen; head -c4 $@.crclen; \
+    dd if=/dev/zero bs=4 count=2; \
+    printf "$(version)" | dd bs=56 count=1 conv=sync 2>/dev/null; \
+    dd if=/dev/zero bs=$$((0x20000 - 0x84)) count=1 conv=sync 2>/dev/null | \
+      tr "\0" "\377"; \
+    cat $@; \
+  ) > $@.new
+  mv $@.new $@
 endef
 
 define Build/zyxel-nwa-fit-filogic
@@ -687,6 +711,41 @@ define Device/confiabits_mt7981
 endef
 TARGET_DEVICES += confiabits_mt7981
 
+define Device/creatlentem_clt-r30b1-common
+  DEVICE_VENDOR := CreatLentem
+  DEVICE_MODEL := CLT-R30B1
+  DEVICE_ALT0_VENDOR := EDUP
+  DEVICE_ALT0_MODEL := RT2980
+  DEVICE_ALT1_VENDOR := Dragonglass
+  DEVICE_ALT1_MODEL := DXG21
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  KERNEL_IN_UBI := 1
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+
+define Device/creatlentem_clt-r30b1-112m
+  DEVICE_VARIANT := 112M
+  DEVICE_ALT0_VARIANT := 112M
+  DEVICE_ALT1_VARIANT := 112M
+  DEVICE_DTS := mt7981b-creatlentem-clt-r30b1-112m
+  SUPPORTED_DEVICES += clt,r30b1 clt,r30b1-112m
+  IMAGE_SIZE := 114688k
+  $(call Device/creatlentem_clt-r30b1-common)
+endef
+TARGET_DEVICES += creatlentem_clt-r30b1-112m
+
+define Device/creatlentem_clt-r30b1
+  DEVICE_DTS := mt7981b-creatlentem-clt-r30b1
+  SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
+  IMAGE_SIZE := 65536k
+  $(call Device/creatlentem_clt-r30b1-common)
+endef
+TARGET_DEVICES += creatlentem_clt-r30b1
+
 define Device/cudy_ap3000outdoor-v1
   DEVICE_VENDOR := Cudy
   DEVICE_MODEL := AP3000 Outdoor
@@ -944,19 +1003,40 @@ define Device/edgecore_eap111
 endef
 TARGET_DEVICES += edgecore_eap111
 
+define Device/elecom_wrc-x3000gs3
+  DEVICE_VENDOR := ELECOM
+  DEVICE_MODEL := WRC-X3000GS3
+  DEVICE_DTS := mt7981b-elecom-wrc-x3000gs3
+  DEVICE_DTS_DIR := ../dts
+  IMAGES += factory.bin
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  IMAGE/factory.bin := sysupgrade-tar | mstc-header 5.04(XZQ.0)b90 COMD | \
+	elecom-product-header WRC-X3000GS3
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+endef
+TARGET_DEVICES += elecom_wrc-x3000gs3
+
 define Device/gatonetworks_gdsp
   DEVICE_VENDOR := GatoNetworks
   DEVICE_MODEL := gdsp
   DEVICE_DTS := mt7981b-gatonetworks-gdsp
+  DEVICE_DTS_OVERLAY := \
+  mt7981b-gatonetworks-gdsp-gps \
+  mt7981b-gatonetworks-gdsp-sd \
+  mt7981b-gatonetworks-gdsp-sd-boot
   DEVICE_DTS_DIR := ../dts
+  DEVICE_DTC_FLAGS := --pad 4096
   IMAGES := sysupgrade.itb
   IMAGE_SIZE := 32768k
-  DEVICE_PACKAGES := fitblk kmod-mt7915e kmod-mt7981-firmware \
+  DEVICE_PACKAGES := e2fsprogs f2fsck mkf2fs fitblk \
+    kmod-mt7915e kmod-mt7981-firmware \
     kmod-usb-net-qmi-wwan kmod-usb-serial-option kmod-usb3 \
     mt7981-wo-firmware -kmod-phy-aquantia
-  ARTIFACTS := preloader.bin bl31-uboot.fip
+  ARTIFACTS := preloader.bin bl31-uboot.fip sdcard.img.gz
   ARTIFACT/preloader.bin := mt7981-bl2 nor-ddr3
   ARTIFACT/bl31-uboot.fip := mt7981-bl31-uboot gatonetworks_gdsp
+  ARTIFACT/sdcard.img.gz := simplefit |\
+  append-image squashfs-sysupgrade.itb | check-size | gzip
   KERNEL := kernel-bin | gzip
   KERNEL_INITRAMFS := kernel-bin | lzma | \
 	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
@@ -973,8 +1053,12 @@ define Device/glinet_gl-mt2500
   DEVICE_DTS_LOADADDR := 0x47000000
   DEVICE_PACKAGES := -wpad-basic-mbedtls e2fsprogs f2fsck mkf2fs kmod-usb3
   SUPPORTED_DEVICES += glinet,mt2500-emmc glinet,gl-mt2500-airoha
-  IMAGES := sysupgrade.bin
+  IMAGES := sysupgrade.bin factory.bin
+  IMAGE/factory.bin := append-kernel | pad-to 32M | append-rootfs
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-gl-metadata
+  ARTIFACTS := emmc-preloader.bin emmc-bl31-uboot.fip
+  ARTIFACT/emmc-preloader.bin := mt7981-bl2 emmc-ddr4
+  ARTIFACT/emmc-bl31-uboot.fip := mt7981-bl31-uboot glinet_gl-mt2500
 endef
 TARGET_DEVICES += glinet_gl-mt2500
 
@@ -1107,13 +1191,40 @@ define Device/huasifei_wh3000-pro
 endef
 TARGET_DEVICES += huasifei_wh3000-pro
 
+define Device/iptime_ax3000q
+  DEVICE_VENDOR := ipTIME
+  DEVICE_MODEL := AX3000Q
+  DEVICE_DTS := mt7981b-iptime-ax3000q
+  DEVICE_DTS_DIR := ../dts
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 32768k
+  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGES := factory.bin sysupgrade.bin
+  IMAGE/factory.bin := sysupgrade-tar | append-metadata | check-size | iptime-crc32 ax3000q
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
+endef
+TARGET_DEVICES += iptime_ax3000q
+
 define Device/iptime_ax3000sm
   DEVICE_VENDOR := ipTIME
   DEVICE_MODEL := AX3000SM
   DEVICE_DTS := mt7981b-iptime-ax3000sm
   DEVICE_DTS_DIR := ../dts
-  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 32768k
+  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGES := factory.bin sysupgrade.bin
+  IMAGE/factory.bin := sysupgrade-tar | append-metadata | check-size | iptime-crc32 ax3ksm
   IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
   SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
 endef
 TARGET_DEVICES += iptime_ax3000sm
@@ -1570,6 +1681,19 @@ define Device/openembed_som7981
 endef
 TARGET_DEVICES += openembed_som7981
 
+define Device/openfi_6c
+  DEVICE_VENDOR := OpenFi
+  DEVICE_MODEL := 6C
+  DEVICE_DTS := mt7981b-openfi-6c
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_PACKAGES := kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware kmod-usb3
+  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+        fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += openfi_6c
+
 define Device/openwrt_one
   DEVICE_VENDOR := OpenWrt
   DEVICE_MODEL := One
@@ -1882,6 +2006,24 @@ define Device/unielec_u7981-01-nand
   $(call Device/unielec_u7981-01)
 endef
 TARGET_DEVICES += unielec_u7981-01-nand
+
+define Device/wavlink_wl-wn551x3
+  DEVICE_VENDOR := WAVLINK
+  DEVICE_MODEL := WL-WN551X3
+  DEVICE_DTS := mt7981b-wavlink-wl-wn551x3
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_DTS_LOADADDR := 0x47000000
+  UBINIZE_OPTS := -E 5
+  BLOCKSIZE := 128k
+  PAGESIZE := 2048
+  IMAGE_SIZE := 65536k
+  KERNEL_INITRAMFS_SUFFIX := .itb
+  KERNEL_IN_UBI := 1
+  DEVICE_PACKAGES := kmod-usb3 kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware
+  SUPPORTED_DEVICES += mediatek,mt7981-spim-snand-rfb
+  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
+endef
+TARGET_DEVICES += wavlink_wl-wn551x3
 
 define Device/wavlink_wl-wn586x3
   DEVICE_VENDOR := WAVLINK

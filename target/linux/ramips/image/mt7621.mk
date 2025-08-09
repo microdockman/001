@@ -2615,6 +2615,13 @@ define Device/sim_simax1800t
 endef
 TARGET_DEVICES += sim_simax1800t
 
+define Device/sim_simax1800u
+  $(Device/haier-sim_wr1800k)
+  DEVICE_VENDOR := SIM
+  DEVICE_MODEL := SIMAX1800U
+endef
+TARGET_DEVICES += sim_simax1800u
+
 define Device/snr_snr-cpe-me1
   $(Device/dsa-migration)
   $(Device/uimage-lzma-loader)
@@ -2824,8 +2831,8 @@ define Device/tplink_eap615-wall-v1
   DEVICE_VARIANT := v1
   DEVICE_PACKAGES := kmod-mt7915-firmware -uboot-envtools
   TPLINK_BOARD_ID := EAP615-WALL-V1
-  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | pad-to 64k
-  KERNEL_INITRAMFS := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
+  KERNEL := kernel-bin | lzma -d22 | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb | pad-to 64k
+  KERNEL_INITRAMFS := kernel-bin | lzma -d22 | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
   IMAGE_SIZE := 13248k
 endef
 TARGET_DEVICES += tplink_eap615-wall-v1

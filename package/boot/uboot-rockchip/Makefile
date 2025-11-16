@@ -165,6 +165,31 @@ define U-Boot/rockpro64-rk3399
 endef
 
 
+# RK3528 boards
+
+define U-Boot/rk3528/Default
+  BUILD_SUBTARGET:=armv8
+  DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528
+  ATF:=rk3528_bl31_v1.20.elf
+  TPL:=rk3528_ddr_1056MHz_v1.11.bin
+endef
+
+define U-Boot/radxa-e20c-rk3528
+  $(U-Boot/rk3528/Default)
+  NAME:=E20C
+  BUILD_DEVICES:= \
+    radxa_e20c
+endef
+
+define U-Boot/rock-2-rk3528
+  $(U-Boot/rk3528/Default)
+  NAME:=ROCK 2A/2F
+  BUILD_DEVICES:= \
+    radxa_rock-2a \
+    radxa_rock-2f
+endef
+
+
 # RK3566 boards
 
 define U-Boot/rk3566/Default
@@ -226,6 +251,13 @@ define U-Boot/fastrhino-r66s-rk3568
     lunzn_fastrhino-r66s
 endef
 
+define U-Boot/generic-rk3568
+  $(U-Boot/rk3568/Default)
+  NAME:=Generic RK3566/RK3568 board
+  BUILD_DEVICES:= \
+    linkease_easepi-r1
+endef
+
 define U-Boot/nanopi-r5c-rk3568
   $(U-Boot/rk3568/Default)
   NAME:=NanoPi R5C
@@ -273,6 +305,13 @@ define U-Boot/rk3576/Default
 	+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3576-tpl
   ATF:=rk3576_bl31.elf
   TPL:=rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.09.bin
+endef
+
+define U-Boot/generic-rk3576
+  $(U-Boot/rk3576/Default)
+  NAME:=Generic RK3576
+  BUILD_DEVICES:= \
+    friendlyarm_nanopi-r76s
 endef
 
 define U-Boot/rock-4d-rk3576
@@ -381,17 +420,21 @@ UBOOT_TARGETS := \
   rock64-rk3328 \
   rock-pi-e-rk3328 \
   rock-pi-e-v3-rk3328 \
+  radxa-e20c-rk3528 \
+  rock-2-rk3528 \
   nanopi-r3s-rk3566 \
   radxa-cm3-io-rk3566 \
   radxa-zero-3-rk3566 \
   rock-3c-rk3566 \
   bpi-r2-pro-rk3568 \
   fastrhino-r66s-rk3568 \
+  generic-rk3568 \
   nanopi-r5c-rk3568 \
   nanopi-r5s-rk3568 \
   radxa-e25-rk3568 \
   rock-3a-rk3568 \
   rock-3b-rk3568 \
+  generic-rk3576 \
   rock-4d-rk3576 \
   generic-rk3588 \
   nanopc-t6-rk3588 \

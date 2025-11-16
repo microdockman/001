@@ -190,6 +190,68 @@ static int rtldsa_930x_get_mirror_config(struct rtldsa_mirror_config *config,
 	return 0;
 }
 
+static int rtldsa_930x_port_rate_police_add(struct dsa_switch *ds, int port,
+					    const struct flow_action_entry *act,
+					    bool ingress)
+{
+	u32 burst;
+	u64 rate;
+	u32 addr;
+
+	/* rate has unit 16000 bit */
+	rate = div_u64(act->police.rate_bytes_ps, 2000);
+	rate = min_t(u64, rate, RTL93XX_BANDWIDTH_CTRL_RATE_MAX);
+	rate |= RTL93XX_BANDWIDTH_CTRL_ENABLE;
+
+	if (ingress)
+		addr = RTL930X_BANDWIDTH_CTRL_INGRESS(port);
+	else
+		addr = RTL930X_BANDWIDTH_CTRL_EGRESS(port);
+
+	if (ingress) {
+		burst = min_t(u32, act->police.burst, RTL930X_BANDWIDTH_CTRL_INGRESS_BURST_MAX);
+
+		/* set burst high on/off the same to avoid TCP oscillation */
+		sw_w32(burst, RTL930X_BANDWIDTH_CTRL_INGRESS_BURST_HIGH_ON(port));
+		sw_w32(burst, RTL930X_BANDWIDTH_CTRL_INGRESS_BURST_HIGH_OFF(port));
+
+		/* Enable ingress bandwidth flow control to improve TCP throughput and avoid
+		 * the drops behavior of the RTL930x ingress rate limiter which seem to not
+		 * play well with any congestion control algorithm
+		 */
+		sw_w32_mask(0, RTL930X_INGRESS_FC_CTRL_EN(port),
+			    RTL930X_INGRESS_FC_CTRL(port));
+	} else {
+		burst = min_t(u32, act->police.burst, RTL930X_BANDWIDTH_CTRL_MAX_BURST);
+
+		sw_w32(burst, addr + 4);
+	}
+
+	sw_w32(rate, addr);
+
+	return 0;
+}
+
+static int rtldsa_930x_port_rate_police_del(struct dsa_switch *ds, int port,
+					    struct flow_cls_offload *cls,
+					    bool ingress)
+{
+	u32 addr;
+
+	if (ingress)
+		addr = RTL930X_BANDWIDTH_CTRL_INGRESS(port);
+	else
+		addr = RTL930X_BANDWIDTH_CTRL_EGRESS(port);
+
+	sw_w32_mask(RTL93XX_BANDWIDTH_CTRL_ENABLE, 0, addr);
+
+	if (ingress)
+		sw_w32_mask(RTL930X_INGRESS_FC_CTRL_EN(port), 0,
+			    RTL930X_INGRESS_FC_CTRL(port));
+
+	return 0;
+}
+
 inline static int rtl930x_trk_mbr_ctr(int group)
 {
 	return RTL930X_TRK_MBR_CTRL + (group << 2);
@@ -676,8 +738,8 @@ static void rtl930x_write_mcast_pmask(int idx, u64 portmask)
 	rtl_table_release(q);
 }
 
-void rtldsa_930x_set_receive_management_action(int port, rma_ctrl_t type,
-					       action_type_t action)
+static void rtldsa_930x_set_receive_management_action(int port, rma_ctrl_t type,
+						      action_type_t action)
 {
 	u32 shift;
 	u32 value;
@@ -753,19 +815,6 @@ void rtldsa_930x_set_receive_management_action(int port, rma_ctrl_t type,
 		sw_w32_mask(GENMASK(shift + 1, shift), value << shift, reg);
 		break;
 	}
-}
-
-static u64 rtl930x_traffic_get(int source)
-{
-	u32 v;
-	struct table_reg *r = rtl_table_get(RTL9300_TBL_0, 6);
-
-	rtl_table_read(r, source);
-	v = sw_r32(rtl_table_data(r, 0));
-	rtl_table_release(r);
-	v = v >> 3;
-
-	return v;
 }
 
 /* Enable traffic between a source port and a destination port matrix */
@@ -920,6 +969,9 @@ static void rtl930x_init_eee(struct rtl838x_switch_priv *priv, bool enable)
 
 	priv->eee_enabled = enable;
 }
+
+#ifdef CONFIG_NET_DSA_RTL83XX_RTL930X_L3_OFFLOAD
+
 #define HASH_PICK(val, lsb, len)   ((val & (((1 << len) - 1) << lsb)) >> lsb)
 
 static u32 rtl930x_l3_hash4(u32 ip, int algorithm, bool move_dip)
@@ -1473,6 +1525,8 @@ static void rtl930x_set_l3_nexthop(int idx, u16 dmac_id, u16 interface)
 	rtl_table_release(r);
 }
 
+#endif /* CONFIG_NET_DSA_RTL83XX_RTL930X_L3_OFFLOAD */
+
 static void rtl930x_pie_lookup_enable(struct rtl838x_switch_priv *priv, int index)
 {
 	int block = index / PIE_BLOCK_SIZE;
@@ -2000,6 +2054,8 @@ static void rtl930x_pie_init(struct rtl838x_switch_priv *priv)
 
 }
 
+#ifdef CONFIG_NET_DSA_RTL83XX_RTL930X_L3_OFFLOAD
+
 /* Sets up an egress interface for L3 actions
  * Actions for ip4/6_icmp_redirect, ip4/6_pbr_icmp_redirect are:
  * 0: FORWARD, 1: DROP, 2: TRAP2CPU, 3: COPY2CPU, 4: TRAP2MASTERCPU 5: COPY2MASTERCPU
@@ -2206,6 +2262,8 @@ static int rtl930x_l3_setup(struct rtl838x_switch_priv *priv)
 	return 0;
 }
 
+#endif /* CONFIG_NET_DSA_RTL83XX_RTL930X_L3_OFFLOAD */
+
 static u32 rtl930x_packet_cntr_read(int counter)
 {
 	u32 v;
@@ -2269,6 +2327,24 @@ static void rtl930x_vlan_port_pvid_set(int port, enum pbvlan_type type, int pvid
 		sw_w32_mask(0xfff << 2, pvid << 2, RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
 	else
 		sw_w32_mask(0xfff << 16, pvid << 16, RTL930X_VLAN_PORT_PB_VLAN + (port << 2));
+}
+
+static int rtldsa_930x_vlan_port_fast_age(struct rtl838x_switch_priv *priv, int port, u16 vid)
+{
+	u32 val;
+
+	sw_w32(port << 11, RTL930X_L2_TBL_FLUSH_CTRL + 4);
+
+	val = 0;
+	val |= vid << 12;
+	val |= BIT(26); /* compare port id */
+	val |= BIT(28); /* compare VID */
+	val |= BIT(30); /* status - trigger flush */
+	sw_w32(val, RTL930X_L2_TBL_FLUSH_CTRL);
+
+	do { } while (sw_r32(priv->r->l2_tbl_flush_ctrl) & BIT(30));
+
+	return 0;
 }
 
 static int rtl930x_set_ageing_time(unsigned long msec)
@@ -2423,7 +2499,7 @@ static void rtl930x_led_init(struct rtl838x_switch_priv *priv)
 		sw_w32_mask(0x3 << pos, 0, RTL930X_LED_PORT_FIB_SET_SEL_CTRL(i));
 		sw_w32_mask(0x3 << pos, 0, RTL930X_LED_PORT_COPR_SET_SEL_CTRL(i));
 
-		if (!priv->ports[i].phy && !(forced_leds_per_port[i]))
+		if (!priv->ports[i].phy && !priv->pcs[i] && !(forced_leds_per_port[i]))
 			continue;
 
 		if (forced_leds_per_port[i] > 0)
@@ -2457,6 +2533,78 @@ static void rtl930x_led_init(struct rtl838x_switch_priv *priv)
 		dev_dbg(dev, "%08x: %08x\n", 0xbb00cc00 + i * 4, sw_r32(0xcc00 + i * 4));
 }
 
+static void rtldsa_930x_qos_set_group_selector(int port, int group)
+{
+	sw_w32_mask(RTL93XX_PORT_TBL_IDX_CTRL_IDX_MASK(port),
+		    group << RTL93XX_PORT_TBL_IDX_CTRL_IDX_OFFSET(port),
+		    RTL930X_PORT_TBL_IDX_CTRL(port));
+}
+
+static void rtldsa_930x_qos_setup_default_dscp2queue_map(void)
+{
+	u32 queue;
+
+	/* The default mapping between dscp and queue is based on
+	 * the first 3 bits indicate the precedence (prio = dscp >> 3).
+	 */
+	for (int i = 0; i < DSCP_MAP_MAX; i++) {
+		queue = (i >> 3) << RTL93XX_REMAP_DSCP_INTPRI_DSCP_OFFSET(i);
+		sw_w32_mask(RTL93XX_REMAP_DSCP_INTPRI_DSCP_MASK(i),
+			    queue, RTL930X_REMAP_DSCP(i));
+	}
+}
+
+static void rtldsa_930x_qos_prio2queue_matrix(int *min_queues)
+{
+	u32 v = 0;
+
+	for (int i = 0; i < MAX_PRIOS; i++)
+		v |= i << (min_queues[i] * 3);
+
+	sw_w32(v, RTL930X_QM_INTPRI2QID_CTRL);
+}
+
+static void rtldsa_930x_qos_set_scheduling_queue_weights(struct rtl838x_switch_priv *priv)
+{
+	struct dsa_port *dp;
+	u32 addr;
+
+	dsa_switch_for_each_user_port(dp, priv->ds) {
+		for (int q = 0; q < 8; q++) {
+			if (dp->index < 24)
+				addr = RTL930X_SCHED_PORT_Q_CTRL_SET0(dp->index, q);
+			else
+				addr = RTL930X_SCHED_PORT_Q_CTRL_SET1(dp->index, q);
+
+			sw_w32(rtldsa_default_queue_weights[q], addr);
+		}
+	}
+}
+
+static void rtldsa_930x_qos_init(struct rtl838x_switch_priv *priv)
+{
+	struct dsa_port *dp;
+	u32 v;
+
+	/* Assign all the ports to the Group-0 */
+	dsa_switch_for_each_user_port(dp, priv->ds)
+		rtldsa_930x_qos_set_group_selector(dp->index, 0);
+
+	rtldsa_930x_qos_prio2queue_matrix(rtldsa_max_available_queue);
+
+	/* configure priority weights */
+	v = 0;
+	v |= FIELD_PREP(RTL93XX_PRI_SEL_TBL_CTRL_PORT_MASK, 3);
+	v |= FIELD_PREP(RTL93XX_PRI_SEL_TBL_CTRL_DSCP_MASK, 5);
+	v |= FIELD_PREP(RTL93XX_PRI_SEL_TBL_CTRL_ITAG_MASK, 6);
+	v |= FIELD_PREP(RTL93XX_PRI_SEL_TBL_CTRL_OTAG_MASK, 7);
+
+	sw_w32(v, RTL930X_PRI_SEL_TBL_CTRL(0));
+
+	rtldsa_930x_qos_setup_default_dscp2queue_map();
+	rtldsa_930x_qos_set_scheduling_queue_weights(priv);
+}
+
 const struct rtl838x_reg rtl930x_reg = {
 	.mask_port_reg_be = rtl838x_mask_port_reg,
 	.set_port_reg_be = rtl838x_set_port_reg,
@@ -2468,9 +2616,12 @@ const struct rtl838x_reg rtl930x_reg = {
 	.stat_rst = RTL930X_STAT_RST,
 	.stat_port_std_mib = RTL930X_STAT_PORT_MIB_CNTR,
 	.stat_port_prv_mib = RTL930X_STAT_PORT_PRVTE_CNTR,
+	.stat_counters_lock = rtldsa_counters_lock_register,
+	.stat_counters_unlock = rtldsa_counters_unlock_register,
+	.stat_update_counters_atomically = rtldsa_update_counters_atomically,
+	.stat_counter_poll_interval = RTLDSA_COUNTERS_POLL_INTERVAL,
 	.traffic_enable = rtl930x_traffic_enable,
 	.traffic_disable = rtl930x_traffic_disable,
-	.traffic_get = rtl930x_traffic_get,
 	.traffic_set = rtl930x_traffic_set,
 	.l2_ctrl_0 = RTL930X_L2_CTRL,
 	.l2_ctrl_1 = RTL930X_L2_AGE_CTRL,
@@ -2500,6 +2651,8 @@ const struct rtl838x_reg rtl930x_reg = {
 	.l2_port_new_salrn = rtl930x_l2_port_new_salrn,
 	.l2_port_new_sa_fwd = rtl930x_l2_port_new_sa_fwd,
 	.get_mirror_config = rtldsa_930x_get_mirror_config,
+	.port_rate_police_add = rtldsa_930x_port_rate_police_add,
+	.port_rate_police_del = rtldsa_930x_port_rate_police_del,
 	.read_l2_entry_using_hash = rtl930x_read_l2_entry_using_hash,
 	.write_l2_entry_using_hash = rtl930x_write_l2_entry_using_hash,
 	.read_cam = rtl930x_read_cam,
@@ -2507,6 +2660,7 @@ const struct rtl838x_reg rtl930x_reg = {
 	.vlan_port_keep_tag_set = rtl930x_vlan_port_keep_tag_set,
 	.vlan_port_pvidmode_set = rtl930x_vlan_port_pvidmode_set,
 	.vlan_port_pvid_set = rtl930x_vlan_port_pvid_set,
+	.vlan_port_fast_age = rtldsa_930x_vlan_port_fast_age,
 	.trk_mbr_ctr = rtl930x_trk_mbr_ctr,
 	.rma_bpdu_fld_pmask = RTL930X_RMA_BPDU_FLD_PMSK,
 	.init_eee = rtl930x_init_eee,
@@ -2522,6 +2676,7 @@ const struct rtl838x_reg rtl930x_reg = {
 	.l2_learning_setup = rtl930x_l2_learning_setup,
 	.packet_cntr_read = rtl930x_packet_cntr_read,
 	.packet_cntr_clear = rtl930x_packet_cntr_clear,
+#ifdef CONFIG_NET_DSA_RTL83XX_RTL930X_L3_OFFLOAD
 	.route_read = rtl930x_route_read,
 	.route_write = rtl930x_route_write,
 	.host_route_write = rtl930x_host_route_write,
@@ -2535,9 +2690,11 @@ const struct rtl838x_reg rtl930x_reg = {
 	.get_l3_router_mac = rtl930x_get_l3_router_mac,
 	.set_l3_router_mac = rtl930x_set_l3_router_mac,
 	.set_l3_egress_intf = rtl930x_set_l3_egress_intf,
+#endif
 	.set_distribution_algorithm = rtl930x_set_distribution_algorithm,
 	.led_init = rtl930x_led_init,
 	.enable_learning = rtldsa_930x_enable_learning,
 	.enable_flood = rtldsa_930x_enable_flood,
 	.set_receive_management_action = rtldsa_930x_set_receive_management_action,
+	.qos_init = rtldsa_930x_qos_init,
 };

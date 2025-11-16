@@ -587,11 +587,6 @@ static void rtl838x_stp_set(struct rtl838x_switch_priv *priv, u16 msti, u32 port
 	priv->r->exec_tbl0_cmd(cmd);
 }
 
-static u64 rtl838x_traffic_get(int source)
-{
-	return rtl838x_get_port_reg(rtl838x_port_iso_ctrl(source));
-}
-
 static void rtl838x_traffic_set(int source, u64 dest_matrix)
 {
 	rtl838x_set_port_reg(dest_matrix, rtl838x_port_iso_ctrl(source));
@@ -1678,10 +1673,13 @@ const struct rtl838x_reg rtl838x_reg = {
 	.stat_port_rst = RTL838X_STAT_PORT_RST,
 	.stat_rst = RTL838X_STAT_RST,
 	.stat_port_std_mib = RTL838X_STAT_PORT_STD_MIB,
+	.stat_counters_lock = rtldsa_counters_lock_register,
+	.stat_counters_unlock = rtldsa_counters_unlock_register,
+	.stat_update_counters_atomically = rtldsa_update_counters_atomically,
+	.stat_counter_poll_interval = RTLDSA_COUNTERS_POLL_INTERVAL,
 	.port_iso_ctrl = rtl838x_port_iso_ctrl,
 	.traffic_enable = rtl838x_traffic_enable,
 	.traffic_disable = rtl838x_traffic_disable,
-	.traffic_get = rtl838x_traffic_get,
 	.traffic_set = rtl838x_traffic_set,
 	.l2_ctrl_0 = RTL838X_L2_CTRL_0,
 	.l2_ctrl_1 = RTL838X_L2_CTRL_1,

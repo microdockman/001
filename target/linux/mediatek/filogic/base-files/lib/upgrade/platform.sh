@@ -87,6 +87,7 @@ platform_do_upgrade() {
 	bananapi,bpi-r4-2g5|\
 	bananapi,bpi-r4-poe|\
 	bananapi,bpi-r4-lite|\
+	bazis,ax3000wm|\
 	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
 	comfast,cf-wr632ax-ubootmod|\
@@ -124,6 +125,7 @@ platform_do_upgrade() {
 	acer,predator-w6|\
 	acer,predator-w6d|\
 	acer,vero-w6m|\
+	airpi,ap3000m|\
 	arcadyan,mozart|\
 	glinet,gl-mt2500|\
 	glinet,gl-mt6000|\
@@ -277,6 +279,7 @@ platform_check_image() {
 	bananapi,bpi-r4-2g5|\
 	bananapi,bpi-r4-poe|\
 	bananapi,bpi-r4-lite|\
+	bazis,ax3000wm|\
 	cmcc,a10-ubootmod|\
 	cmcc,rax3000m|\
 	comfast,cf-wr632ax-ubootmod|\
@@ -346,6 +349,7 @@ platform_copy_config() {
 	acer,predator-w6|\
 	acer,predator-w6d|\
 	acer,vero-w6m|\
+	airpi,ap3000m|\
 	arcadyan,mozart|\
 	glinet,gl-mt2500|\
 	glinet,gl-mt6000|\

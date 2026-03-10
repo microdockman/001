@@ -10,8 +10,8 @@ src-git freifunk https://github.com/freifunk/openwrt-packages.git
 #src-link custom /usr/src/openwrt/custom-feed
 #src-git kenzo https://github.com/smalldickman/kenzo
 #src-git small https://github.com/smalldickman/small
-src-git 0lienol https://github.com/microdockman/xiaorouji_passwall-packages
-src-git 1lienol https://github.com/microdockman/xiaorouji_passwall
-src-git 2lienol https://github.com/microdockman/passwall2
+#src-git 0lienol https://github.com/microdockman/xiaorouji_passwall-packages
+#src-git 1lienol https://github.com/microdockman/xiaorouji_passwall
+#src-git 2lienol https://github.com/microdockman/passwall2
 #src-git 0lede https://github.com/microdockman/lede
-#src-git 0helloworld https://github.com/microdockman/helloworld
+src-git 0helloworld https://github.com/microdockman/helloworld
